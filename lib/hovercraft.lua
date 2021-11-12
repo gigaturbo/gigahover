@@ -14,20 +14,6 @@ local get_player_by_name = minetest.get_player_by_name
 -- private
 --------------------------------------------------------------------------------
 
-local function fastacc(vx, vy, vz, yaw, cu, cj, d, dt)
-    local tmp3 = vy * vy
-    local tmp4 = vz * vz
-    local tmp5 = vx * vx
-    local tmp6 = tmp3 + tmp4
-    local tmp7 = tmp5 + tmp6
-    local tmp8 = math.sqrt(tmp7)
-    return {
-        x = dt * (150 * cu * math.cos(yaw) - 0.1 * vx * tmp8),
-        y = dt * (50 + 45 * cj - 50 * d - 0.1 * vy * tmp8),
-        z = dt * (150 * cu * math.sin(yaw) - 0.1 * vz * tmp8)
-    }
-end
-
 local hovercraft = {
     physical = true,
     collisionbox = {-0.8, 0, -0.8, 0.8, 1.2, 0.8},
@@ -38,11 +24,17 @@ local hovercraft = {
     owner = nil,
     timer = 0,
     vel = vector3.zero,
+    --
+    -- ACTIVATE
+    --
     on_activate = function(self, staticdata, dtime_s) -- time since unloaded
         self.object:set_armor_groups({immortal = 1})
         self.object:set_animation({x = 0, y = 24}, 30)
         self.owner = core.deserialize(staticdata).owner
     end,
+    --
+    -- PUNCH
+    --
     on_punch = function(self, puncher)
         if not puncher or not puncher:is_player() then return end
         if self.player then return end
@@ -63,6 +55,9 @@ local hovercraft = {
         self.object:remove()
         pinv:add_item('main', stack)
     end,
+    --
+    -- RIGHTCLICK
+    --
     on_rightclick = function(self, clicker)
         if not clicker or not clicker:is_player() then return end
 
@@ -94,73 +89,18 @@ local hovercraft = {
             self.object:set_animation({x = 0, y = 0})
         end
     end,
-    -- on_step = function(self, dtime)
-
-    --     local vel = vector3(self.object:get_velocity())
-    --     local pos = self.object:get_pos()
-    --     local ctrlup = 0
-    --     local ctrljump = 0
-    --     local yaw = self.object:get_yaw()
-
-    --     if vel:length() < 0.5 then -- stop
-    --         vel = vector3.zero
-    --         self.object:set_velocity(vel)
-    --     end
-
-    --     -- controls 
-    --     if self.player then
-
-    --         self.player:set_animation({x = 81, y = 81})
-    --         local ctrl = self.player:get_player_control()
-
-    --         -- yaw
-    --         if ctrl.left then
-    --             yaw = yaw + 0.05
-    --         elseif ctrl.right then
-    --             yaw = yaw - 0.05
-    --         end
-    --         self.object:set_yaw(yaw)
-
-    --         -- ctrlup
-    --         if ctrl.up then
-    --             ctrlup = 1
-    --         elseif ctrl.down then
-    --             ctrlup = -1
-    --         end
-
-    --         -- ctrljump
-    --         if ctrl.jump then ctrljump = 1 end
-
-    --     end
-
-    --     -- dist
-    --     local p1 = (vector3(pos):round() + vector3(-2, -3, -2))
-    --     local p2 = (vector3(pos):round() + vector3(2, -1, 2))
-    --     p1, p2 = p1:sort(p2)
-    --     local dist = 3
-    --     local nname
-    --     for z = p1.z, p2.z do
-    --         for y = p1.y, p2.y do
-    --             for x = p1.x, p2.x do
-    --                 nname = minetest.get_node({x = x, y = y, z = z}).name
-    --                 if nname ~= 'air' then
-    --                     dist = pos.y - y - 0.5
-    --                 end
-    --             end
-    --         end
-    --     end
-
-    --     self.object:add_velocity(fastacc(vel.x, vel.y, vel.z, yaw, ctrlup,
-    --                                      ctrljump, dist, dtime))
-    -- end,
+    --
+    -- STEP
+    --
     on_step = function(self, dtime)
 
         local acc = vector3.zero
         local vel = vector3.zero
         local thrust = vector3.zero
         local drag = vector3.zero
-        local brake = 0
+        local lift = vector3.zero
         local weight = vector3.zero
+        local brake = 0
         local pos = vector3(self.object:get_pos())
         local speed
 
@@ -208,7 +148,7 @@ local hovercraft = {
             thrust = thrust:scale(30)
 
             -- lift?
-            -- if ctrl.jump then -- end
+            if ctrl.jump then lift = vector3.y:scale(80) end
 
         end
 
@@ -219,46 +159,125 @@ local hovercraft = {
             drag = -(vel:norm() * (speed * speed)) * (5 - speed) / 2
         end
 
-        minetest.chat_send_all('V: ' .. speed)
+        -- minetest.chat_send_all('V: ' .. speed)
 
         local rp = pos:round()
-        local p1 = (rp + vector3(-2, -3, -2))
-        local p2 = (rp + vector3(2, 0, 2))
+        local p1 = (rp + vector3(-2, -1, -2))
+        local p2 = (rp + vector3(2, -1, 2))
         p1, p2 = p1:sort(p2)
-        local dist = 4
-        local found
-        local nname
+        local grounded = nil
+        local nname = nil
         for y = p2.y, p1.y, -1 do
             for z = p1.z, p2.z do
                 for x = p1.x, p2.x do
                     nname = minetest.get_node({x = x, y = y, z = z}).name
                     if nname ~= 'air' then
                         -- minetest.set_node({x = x, y = y, z = z},
-                        --                   {name = 'wool:blue'})
-                        dist = pos.y + 0.5 - y
-                        found = true
-                        break
+                        --                   {name = 'wool:brown'})
+                        grounded = true
+                        -- break
                     end
                 end
-                if found then break end
+                -- if found then break end
             end
-            if found then break end
+            -- if found then break end
         end
 
-        if dist < 2 then -- 0 - 2 UP
-            vel = vel:set(_, 5 + speed / 2, _)
-            acc = thrust + drag:set(_, 0, _)
-            self.object:set_velocity(vel + acc * dtime)
-        elseif dist < 3 then -- 2 -- 3 STABLE
-            vel = vel:set(_, 0, _)
-            acc = thrust + drag:set(_, 0, _)
-            self.object:set_velocity(vel + acc * dtime)
-        else -- 3+
-            weight = -vector3.y:scale(40)
-            acc = drag + weight + thrust
-            self.object:set_velocity(vel + acc * dtime)
+        local blocked = false
+
+        if speed == 0 then
+            if grounded then
+                -- tDO
+                if blocked then
+
+                else
+
+                end
+            else -- nevermind blocked
+                weight = -vector3.y:scale(40)
+            end
+        else -- moving
+            if grounded then
+                local apos = pos -- - vector3(0, 0.5, 0)
+                local fvel = vel:set(_, 0, _):scale(4)
+                local prot = pi / 4
+                local nw1, bp1 = minetest.line_of_sight(apos, apos + fvel)
+                local nw2, bp2 = minetest.line_of_sight(apos, apos +
+                                                            fvel:rotate_around(
+                                                                vector3.y, prot))
+                local nw3, bp3 = minetest.line_of_sight(apos, apos +
+                                                            fvel:rotate_around(
+                                                                vector3.y, -prot))
+                local blocked = (not nw1) or (not nw2) or (not nw3)
+                if blocked then
+                    local d = 5
+                    if not nw1 then
+                        minetest.set_node({x = bp1.x, y = bp1.y, z = bp1.z},
+                                          {name = 'wool:green'})
+                        d = math.min(d, apos:dist(bp1))
+                    end
+                    if not nw2 then
+                        minetest.set_node({x = bp2.x, y = bp2.y, z = bp2.z},
+                                          {name = 'wool:red'})
+                        d = math.min(d, apos:dist(bp2))
+                    end
+                    if not nw3 then
+                        minetest.set_node({x = bp3.x, y = bp3.y, z = bp3.z},
+                                          {name = 'wool:blue'})
+                        d = math.min(d, apos:dist(bp3))
+                    end
+                    d = math.max(d - 1.4, 0.2)
+                    local hspeed = vel:set(_, 0, _):length()
+                    local time_before_hit = d / hspeed
+                    local vspeed = 1 / time_before_hit
+                    vel = vel:set(_, vspeed, _):limit(40)
+                else -- not blocked
+                    vel = vel:set(_, 0, _)
+                end
+            else -- not grounded but maybe blocked?
+                local apos = pos - vector3(0, 0.5, 0)
+                local fvel = vel:set(_, 0, _):scale(3)
+                local prot = pi / 4
+                local nw1, bp1 = minetest.line_of_sight(apos, apos + fvel)
+                local nw2, bp2 = minetest.line_of_sight(apos, apos +
+                                                            fvel:rotate_around(
+                                                                vector3.y, prot))
+                local nw3, bp3 = minetest.line_of_sight(apos, apos +
+                                                            fvel:rotate_around(
+                                                                vector3.y, -prot))
+                local blocked = (not nw1) or (not nw2) or (not nw3)
+                if blocked then
+                    weight = -vector3.y:scale(40)
+                else -- not blocked
+                    weight = -vector3.y:scale(40)
+                end
+            end
         end
+
+        -- minetest.chat_send_all('G: ' .. tostring(not not grounded))
+        -- minetest.chat_send_all('B: ' .. tostring(blocked))
+        -- minetest.chat_send_all('S: ' .. tostring(speed == 0))
+
+        acc = drag + weight + thrust + lift
+        self.object:set_velocity(vel + acc * dtime)
+
+        -- if dist < 2 then -- 0 - 2 UP
+        --     vel = vel:set(_, 5 + speed / 2, _)
+        --     acc = thrust + drag:set(_, 0, _)
+        --     self.object:set_velocity(vel + acc * dtime)
+        -- elseif dist < 3 then -- 2 -- 3 STABLE
+        --     vel = vel:set(_, 0, _)
+        --     acc = thrust + drag:set(_, 0, _)
+        --     self.object:set_velocity(vel + acc * dtime)
+        -- else -- 3+
+        --     weight = -vector3.y:scale(40)
+        --     acc = drag + weight + thrust
+        --     self.object:set_velocity(vel + acc * dtime)
+        -- end
     end,
+    --
+    -- STATICDATA
+    --
     get_staticdata = function(self)
         local sdata = {owner = self.owner}
         return core.serialize(sdata)
