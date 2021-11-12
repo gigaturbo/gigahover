@@ -1,0 +1,5 @@
+# textdomain: gigahover
+hovercraft=
+You cannot take @1's hovercraft.=
+You don't have room in your inventory.=
+You cannot ride @1's hovercraft.=

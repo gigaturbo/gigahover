@@ -1,0 +1,1 @@
+gigahover.S = minetest.get_translator('gigahover')

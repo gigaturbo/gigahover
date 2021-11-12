@@ -1,0 +1,17 @@
+{
+    "type": "MOD",
+    "title": "GigaHover",
+    "name": "gigahover",
+    "short_description": "Adds an hovercraft",
+    "long_description": "CodeBlock\n=========================\n\n![License](https://img.shields.io/badge/License-GPLv3-blue.svg)\n\n**Add an hovercraft**\n\n**License:** GPLv3   \n**Credits:** inspired by [Hovercrafts](https://content.minetest.net/packages/AntumDeluge/hovercraft_ad/)\n\n\n## Quick start\n",
+    "tags": [
+        "tools"
+    ],
+    "content_warnings": null,
+    "license": "GPL-3.0-only",
+    "media_license": "GPL-3.0-only",
+    "repo": "",
+    "website": null,
+    "issue_tracker": "",
+    "forums": null
+}
